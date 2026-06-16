@@ -1,6 +1,6 @@
 -- [[ PRODIGIOZX MODS + AUTO JJS ]] --
 -- Criador: Lucca
--- Versão: 5.0 (Suporte Celular + Seletor de Place)
+-- Versão: 5.1 (Bolinha Vermelha com Drag Corrigido)
 
 -- ============ CONFIGURAÇÕES DE COMPATIBILIDADE ============
 local usingTask = pcall(function() return task.wait end)
@@ -26,7 +26,6 @@ end
 
 -- ============ VERIFICAR SE É MOBILE ============
 local isMobile = game:GetService("UserInputService").TouchEnabled
-local isMobileDevice = game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").MouseEnabled
 
 -- ============ VERIFICAR SUPORTE A FUNÇÕES ============
 local hasSaveSupport = pcall(function()
@@ -62,7 +61,7 @@ local PLACE_CONFIG = {
     }
 }
 
-local placeAtual = PLACE_CONFIG.NOVA -- Padrão: Nova Place
+local placeAtual = PLACE_CONFIG.NOVA
 
 -- ============ VERIFICAR EVENTO JJS ============
 local jjsEvent = nil
@@ -93,7 +92,7 @@ local config = {
     p2Active = false,
     p3Active = false,
     p4Active = false,
-    placeAtual = "NOVA" -- Salva a place escolhida
+    placeAtual = "NOVA"
 }
 
 local configFolder = "ProdigiozxConfig"
@@ -147,14 +146,13 @@ local delayValue = config.delayValue or 0.8
 local currentLoop = nil
 local loopActive = false
 
--- Carregar place salva
 if config.placeAtual == "NOVA" then
     placeAtual = PLACE_CONFIG.NOVA
 else
     placeAtual = PLACE_CONFIG.ANTIGA
 end
 
--- ============ FUNÇÕES DE UPDATE (COMPATÍVEIS COM KAVO) ============
+-- ============ FUNÇÕES DE UPDATE ============
 local function updateLabel(label, text)
     if not label then return end
     pcall(function()
@@ -319,7 +317,7 @@ local function carregarAnimacao()
         local anim = Instance.new("Animation")
         anim.AnimationId = animId
         animTrack = hum:LoadAnimation(anim)
-        print("✅ Animação carregada: " .. animId .. " (" .. placeAtual.nome .. ")")
+        print("✅ Animação carregada: " .. animId)
     end)
 end
 
@@ -439,35 +437,27 @@ p4Toggle = SecPistas:NewToggle("Parkour 4", "Ativa P4", function(s)
     saveConfig()
 end)
 
--- ============ ABA: SELETOR DE PLACE ============
+-- ABA: PLACE
 local TabPlace = Window:NewTab("Place")
 local SecPlace = TabPlace:NewSection("Selecionar Place")
 
 local placeLabel = SecPlace:NewLabel("📍 Place atual: " .. placeAtual.nome)
 
-SecPlace:NewButton("🏙️ Place Nova", "Usar animação da nova place (ID: 122367567937291)", function()
+SecPlace:NewButton("🏙️ Place Nova", "Usar animação da nova place", function()
     placeAtual = PLACE_CONFIG.NOVA
     config.placeAtual = "NOVA"
     updateLabel(placeLabel, "📍 Place atual: " .. placeAtual.nome)
     carregarAnimacao()
     saveConfig()
-    print("✅ Place alterada para: NOVA")
 end)
 
-SecPlace:NewButton("🏚️ Place Antiga", "Usar animação da place antiga (ID: 124954987474196)", function()
+SecPlace:NewButton("🏚️ Place Antiga", "Usar animação da place antiga", function()
     placeAtual = PLACE_CONFIG.ANTIGA
     config.placeAtual = "ANTIGA"
     updateLabel(placeLabel, "📍 Place atual: " .. placeAtual.nome)
     carregarAnimacao()
     saveConfig()
-    print("✅ Place alterada para: ANTIGA")
 end)
-
-SecPlace:NewLabel("")
-SecPlace:NewLabel("📌 INFORMAÇÕES:")
-SecPlace:NewLabel("• Nova Place: rbxassetid://122367567937291")
-SecPlace:NewLabel("• Antiga Place: rbxassetid://124954987474196")
-SecPlace:NewLabel("• A animação é atualizada automaticamente")
 
 -- ABA: AUTO JJS
 local TabJJS = Window:NewTab("Auto JJs")
@@ -530,7 +520,6 @@ SecJJS:NewButton("🎭 TESTAR ANIMAÇÃO", "Testa a animação atual", function(
         waitFunc(0.3)
     end
     tocarAnimacao()
-    print("🎭 Testando animação: " .. placeAtual.nome)
 end)
 
 -- ABA: SAVE/LOAD
@@ -567,7 +556,6 @@ SecSave:NewButton("📂 CARREGAR", "Carrega configurações", function()
         jjsCount = config.jjsCount
         delayValue = config.delayValue
         
-        -- Carregar place
         if config.placeAtual == "NOVA" then
             placeAtual = PLACE_CONFIG.NOVA
         else
@@ -626,10 +614,9 @@ local CreditSec = CreditTab:NewSection("Criador")
 CreditSec:NewLabel("👑 CRIADOR: Lucca")
 CreditSec:NewLabel("📖 UI: Kavo Library")
 CreditSec:NewLabel("⚡ Executor: Velocity")
-CreditSec:NewLabel("📱 Suporte Mobile: " .. (isMobile and "✅" or "✅ Universal"))
+CreditSec:NewLabel("📱 Suporte Mobile: ✅")
 CreditSec:NewLabel("💾 Save/Load: " .. (hasSaveSupport and "✅" or "❌"))
 CreditSec:NewLabel("🎯 Auto JJs: " .. (eventFound and "✅" or "❌"))
-CreditSec:NewLabel("🏙️ Place: " .. placeAtual.nome)
 
 -- ABA: CONFIGURAÇÕES
 local ConfigTab = Window:NewTab("Configurações")
@@ -639,7 +626,7 @@ ConfigSec:NewKeybind("🔑 TOGGLE UI", "Tecla para mostrar/esconder", Enum.KeyCo
     Library:ToggleUI()
 end)
 
--- ============ BOTÃO LG (COM SUPORTE CELULAR) ============
+-- ============ BOLINHA VERMELHA (COM DRAG CORRIGIDO) ============
 pcall(function()
     local existingGui = player.PlayerGui:FindFirstChild("LG_Toggle")
     if existingGui then existingGui:Destroy() end
@@ -650,102 +637,84 @@ pcall(function()
     sg.Parent = player.PlayerGui
     
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 50, 0, 50)
+    btn.Size = isMobile and UDim2.new(0, 70, 0, 70) or UDim2.new(0, 50, 0, 50)
     btn.Position = UDim2.new(0, 20, 0.5, -25)
     btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     btn.Text = "LG"
     btn.TextScaled = true
     btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundTransparency = 0
     btn.Parent = sg
-    
-    -- Aumentar área de toque para celular
-    if isMobile then
-        btn.Size = UDim2.new(0, 70, 0, 70) -- Botão maior para mobile
-    end
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = btn
     
-    -- ============ SISTEMA DE ARRASTAR (MOUSE + TOQUE) ============
-    local draggingLG = false
-    local dragStartLG = nil
-    local startPosLG = nil
+    -- ============ SISTEMA DE DRAG (CORRIGIDO) ============
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
     local wasDragging = false
+    local userInputService = game:GetService("UserInputService")
     
-    -- Função para iniciar arrasto
-    local function startDrag(input)
-        draggingLG = true
-        wasDragging = false
-        dragStartLG = input.Position
-        startPosLG = btn.Position
+    -- FUNÇÃO PARA INICIAR ARRASTO
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            wasDragging = false
+            dragStart = input.Position
+            startPos = btn.Position
+        end
     end
     
-    -- Função para finalizar arrasto
-    local function endDrag()
-        if draggingLG then
-            draggingLG = false
-            if not wasDragging then
+    -- FUNÇÃO PARA FINALIZAR ARRASTO
+    local function onInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and not wasDragging then
                 Library:ToggleUI()
             end
+            dragging = false
         end
     end
     
-    -- Função para atualizar arrasto
-    local function updateDrag(input)
-        if draggingLG and input.UserInputType == Enum.UserInputType.MouseMovement then
+    -- FUNÇÃO PARA ATUALIZAR POSIÇÃO
+    local function onInputChanged(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                         input.UserInputType == Enum.UserInputType.Touch) then
             wasDragging = true
-            local delta = input.Position - dragStartLG
-            btn.Position = UDim2.new(startPosLG.X.Scale, startPosLG.X.Offset + delta.X, startPosLG.Y.Scale, startPosLG.Y.Offset + delta.Y)
+            local delta = input.Position - dragStart
+            
+            -- Calcular nova posição
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            
+            -- Limitar na tela
+            local screenSize = game:GetService("GuiService"):GetGuiInset()
+            local maxX = screenSize.X - btn.Size.X.Offset
+            local maxY = screenSize.Y - btn.Size.Y.Offset
+            
+            newX = math.clamp(newX, 0, maxX)
+            newY = math.clamp(newY, 0, maxY)
+            
+            btn.Position = UDim2.new(0, newX, 0, newY)
         end
     end
     
-    -- Suporte para Mouse
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            startDrag(input)
-        end
-    end)
+    -- CONECTAR EVENTOS
+    btn.InputBegan:Connect(onInputBegan)
+    btn.InputEnded:Connect(onInputEnded)
+    userInputService.InputChanged:Connect(onInputChanged)
     
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            endDrag()
-        end
-    end)
-    
-    -- Suporte para TOQUE (CELULAR)
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            startDrag(input)
-        end
-    end)
-    
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            endDrag()
-        end
-    end)
-    
-    -- Atualizar posição (mouse)
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateDrag(input)
-        end
-    end)
-    
-    -- Atualizar posição (toque - celular)
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            updateDrag(input)
-        end
-    end)
+    -- SALVAR POSIÇÃO QUANDO FECHAR O JOGO (opcional)
+    -- (O Kavo UI já salva a posição automaticamente)
 end)
 
 -- ============ INICIALIZAÇÃO FINAL ============
 
 loadConfig()
 
--- Aplicar place salva
 if config.placeAtual == "NOVA" then
     placeAtual = PLACE_CONFIG.NOVA
 else
@@ -755,14 +724,12 @@ end
 jjsCount = config.jjsCount
 delayValue = config.delayValue
 
--- Carregar animação
 spawnFunc(function()
     while not player.Character do waitFunc(0.5) end
     waitFunc(0.5)
     carregarAnimacao()
 end)
 
--- Evento de respawn
 player.CharacterAdded:Connect(function()
     waitFunc(0.5)
     carregarAnimacao()
@@ -775,7 +742,6 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
--- Recriar pistas salvas
 spawnFunc(function()
     waitFunc(1.5)
     if config.p1Active then spawnFunc(buildP1) setToggle(p1Toggle, true) end
@@ -786,9 +752,6 @@ end)
 
 print("✅ PRODIGIOZX MODS carregado!")
 print("👑 Criador: Lucca")
-print("📌 Versão: 5.0 (Suporte Celular + Seletor de Place)")
-print("📱 Modo Mobile: " .. (isMobile and "✅ Ativado" or "❌ Desktop"))
-print("🏙️ Place atual: " .. placeAtual.nome)
-print("🎬 Animação ID: " .. placeAtual.animacaoId)
-print("💾 Save/Load: " .. (hasSaveSupport and "Disponível" or "Indisponível"))
+print("📱 Modo: " .. (isMobile and "Mobile" or "Desktop"))
+print("🏙️ Place: " .. placeAtual.nome)
 print("🎯 Auto JJs: " .. (eventFound and "Disponível" or "Indisponível"))
