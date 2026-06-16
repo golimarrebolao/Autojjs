@@ -1,6 +1,6 @@
 -- [[ PRODIGIOZX MODS + AUTO JJS ]] --
 -- Criador: Lucca
--- Versão: 5.1 (Bolinha Vermelha com Drag Corrigido)
+-- Versão: 6.0 (MOBILE OTIMIZADO)
 
 -- ============ CONFIGURAÇÕES DE COMPATIBILIDADE ============
 local usingTask = pcall(function() return task.wait end)
@@ -26,6 +26,7 @@ end
 
 -- ============ VERIFICAR SE É MOBILE ============
 local isMobile = game:GetService("UserInputService").TouchEnabled
+local userInputService = game:GetService("UserInputService")
 
 -- ============ VERIFICAR SUPORTE A FUNÇÕES ============
 local hasSaveSupport = pcall(function()
@@ -626,39 +627,69 @@ ConfigSec:NewKeybind("🔑 TOGGLE UI", "Tecla para mostrar/esconder", Enum.KeyCo
     Library:ToggleUI()
 end)
 
--- ============ BOLINHA VERMELHA (COM DRAG CORRIGIDO) ============
-pcall(function()
+-- ============ BOLINHA VERMELHA - OTIMIZADA PARA MOBILE ============
+print("🔄 Criando bolinha LG para Mobile...")
+
+local function criarBolinha()
+    -- Verificar se já existe
     local existingGui = player.PlayerGui:FindFirstChild("LG_Toggle")
     if existingGui then existingGui:Destroy() end
     
+    -- Criar ScreenGui
     local sg = Instance.new("ScreenGui")
     sg.Name = "LG_Toggle"
     sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = player.PlayerGui
     
+    -- Criar botão (maior para mobile)
     local btn = Instance.new("TextButton")
-    btn.Size = isMobile and UDim2.new(0, 70, 0, 70) or UDim2.new(0, 50, 0, 50)
-    btn.Position = UDim2.new(0, 20, 0.5, -25)
+    btn.Size = isMobile and UDim2.new(0, 80, 0, 80) or UDim2.new(0, 55, 0, 55)
+    btn.Position = UDim2.new(0, 20, 0, 150) -- Posição fixa em pixels
     btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     btn.Text = "LG"
     btn.TextScaled = true
-    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.BackgroundTransparency = 0
     btn.Parent = sg
+    btn.ZIndex = 999
+    btn.AutoButtonColor = false
+    btn.BorderSizePixel = 0
+    btn.Visible = true
     
+    -- Corner arredondado
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = btn
     
-    -- ============ SISTEMA DE DRAG (CORRIGIDO) ============
+    -- Sombra para melhor visibilidade
+    local shadow = Instance.new("ImageLabel")
+    shadow.Size = UDim2.new(1.2, 0, 1.2, 0)
+    shadow.Position = UDim2.new(-0.1, 0, -0.1, 0)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://1316045965"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.6
+    shadow.ZIndex = 998
+    shadow.Parent = btn
+    
+    -- Sistema de drag melhorado para mobile
     local dragging = false
     local dragStart = nil
     local startPos = nil
     local wasDragging = false
-    local userInputService = game:GetService("UserInputService")
     
-    -- FUNÇÃO PARA INICIAR ARRASTO
-    local function onInputBegan(input)
+    -- Função para obter tamanho da tela
+    local function getScreenSize()
+        local camera = workspace.CurrentCamera
+        if camera then
+            return camera.ViewportSize.X, camera.ViewportSize.Y
+        end
+        return 1920, 1080
+    end
+    
+    -- Iniciar drag (clique/toque)
+    btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -666,50 +697,126 @@ pcall(function()
             dragStart = input.Position
             startPos = btn.Position
         end
-    end
+    end)
     
-    -- FUNÇÃO PARA FINALIZAR ARRASTO
-    local function onInputEnded(input)
+    -- Finalizar drag (soltar)
+    btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
             if dragging and not wasDragging then
+                -- Só abre a UI se não arrastou
                 Library:ToggleUI()
             end
             dragging = false
         end
-    end
+    end)
     
-    -- FUNÇÃO PARA ATUALIZAR POSIÇÃO
-    local function onInputChanged(input)
+    -- Atualizar posição durante drag
+    userInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
                          input.UserInputType == Enum.UserInputType.Touch) then
             wasDragging = true
-            local delta = input.Position - dragStart
             
-            -- Calcular nova posição
+            local delta = input.Position - dragStart
             local newX = startPos.X.Offset + delta.X
             local newY = startPos.Y.Offset + delta.Y
             
-            -- Limitar na tela
-            local screenSize = game:GetService("GuiService"):GetGuiInset()
-            local maxX = screenSize.X - btn.Size.X.Offset
-            local maxY = screenSize.Y - btn.Size.Y.Offset
+            local screenW, screenH = getScreenSize()
+            local btnW = btn.Size.X.Offset
+            local btnH = btn.Size.Y.Offset
             
-            newX = math.clamp(newX, 0, maxX)
-            newY = math.clamp(newY, 0, maxY)
+            -- Limites com margem
+            newX = math.clamp(newX, 0, screenW - btnW)
+            newY = math.clamp(newY, 0, screenH - btnH - 80) -- Margem inferior maior
             
             btn.Position = UDim2.new(0, newX, 0, newY)
         end
+    end)
+    
+    -- Correção quando a tela redimensionar
+    local function onViewportChanged()
+        local screenW, screenH = getScreenSize()
+        local btnW = btn.Size.X.Offset
+        local btnH = btn.Size.Y.Offset
+        local currentX = btn.Position.X.Offset
+        local currentY = btn.Position.Y.Offset
+        
+        -- Reposicionar se estiver fora dos limites
+        if currentX + btnW > screenW then
+            btn.Position = UDim2.new(0, math.max(0, screenW - btnW - 10), 0, currentY)
+        end
+        if currentY + btnH > screenH - 80 then
+            btn.Position = UDim2.new(0, currentX, 0, math.max(0, screenH - btnH - 90))
+        end
+        if currentX < 0 then
+            btn.Position = UDim2.new(0, 5, 0, currentY)
+        end
+        if currentY < 0 then
+            btn.Position = UDim2.new(0, currentX, 0, 5)
+        end
     end
     
-    -- CONECTAR EVENTOS
-    btn.InputBegan:Connect(onInputBegan)
-    btn.InputEnded:Connect(onInputEnded)
-    userInputService.InputChanged:Connect(onInputChanged)
+    -- Conectar ao redimensionamento
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera:GetPropertyChangedSignal("ViewportSize"):Connect(onViewportChanged)
+    end
     
-    -- SALVAR POSIÇÃO QUANDO FECHAR O JOGO (opcional)
-    -- (O Kavo UI já salva a posição automaticamente)
-end)
+    -- Efeitos visuais
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(220, 0, 0)
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    end)
+    
+    -- Para mobile: feedback tátil
+    if isMobile then
+        btn.TouchTap:Connect(function()
+            btn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+            waitFunc(0.1)
+            btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        end)
+    end
+    
+    print("✅ Bolinha LG criada com sucesso! (Tamanho: " .. (isMobile and "Mobile" or "Desktop") .. ")")
+    return btn
+end
+
+-- Criar a bolinha com proteção
+local success, err = pcall(criarBolinha)
+if not success then
+    print("❌ Erro ao criar bolinha: " .. tostring(err))
+    
+    -- Tentativa de fallback
+    pcall(function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "LG_Toggle"
+        sg.ResetOnSpawn = false
+        sg.Parent = player.PlayerGui
+        
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 70, 0, 70)
+        btn.Position = UDim2.new(0, 20, 0, 150)
+        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        btn.Text = "LG"
+        btn.TextScaled = true
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Parent = sg
+        btn.ZIndex = 999
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = btn
+        
+        btn.MouseButton1Click:Connect(function()
+            Library:ToggleUI()
+        end)
+        
+        print("✅ Bolinha criada no fallback!")
+    end)
+end
 
 -- ============ INICIALIZAÇÃO FINAL ============
 
@@ -752,6 +859,7 @@ end)
 
 print("✅ PRODIGIOZX MODS carregado!")
 print("👑 Criador: Lucca")
-print("📱 Modo: " .. (isMobile and "Mobile" or "Desktop"))
+print("📱 Modo: " .. (isMobile and "MOBILE" or "Desktop"))
 print("🏙️ Place: " .. placeAtual.nome)
 print("🎯 Auto JJs: " .. (eventFound and "Disponível" or "Indisponível"))
+print("🔴 Bolinha LG: " .. (player.PlayerGui:FindFirstChild("LG_Toggle") and "VISÍVEL" or "NÃO ENCONTRADA"))
