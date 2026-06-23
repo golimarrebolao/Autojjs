@@ -1,167 +1,97 @@
--- [[ PRODIGIOZX MODS + AUTO JJS ]] --
+-- [[ PRODIGIOZX MODS - VERSÃO COMPLETA ]] --
 -- Criador: Lucca
--- Versão: 6.4 (Drag PC Corrigido)
 
-print("🔴 INICIANDO SCRIPT...")
-
--- ============ CONFIGURAÇÕES DE COMPATIBILIDADE ============
-local usingTask = pcall(function() return task.wait end)
-local waitFunc = usingTask and task.wait or wait
-local spawnFunc = usingTask and task.spawn or (coroutine.wrap or spawn)
-
--- ============ VERIFICAR EXISTÊNCIA DO PLAYER ============
-print("🔍 Procurando jogador...")
-local player = nil
-local maxAttempts = 10
-local attempt = 0
-while not player and attempt < maxAttempts do
-    player = game:GetService("Players").LocalPlayer
-    if not player then
-        waitFunc(0.5)
-        attempt = attempt + 1
-    end
-end
-
-if not player then
-    print("❌ Erro: Não foi possível encontrar o jogador!")
-    return
-end
-print("✅ Jogador encontrado: " .. player.Name)
-
--- ============ DETECTAR PLATAFORMA ============
-local userInputService = game:GetService("UserInputService")
-local isMobile = userInputService.TouchEnabled and not userInputService.MouseEnabled
-local isConsole = userInputService.GamepadEnabled
-local isDesktop = not isMobile and not isConsole
-
-print("🖥️ Plataforma: " .. (isMobile and "MOBILE" or isConsole and "CONSOLE" or "DESKTOP"))
-
--- ============ VERIFICAR SUPORTE ============
-local hasSaveSupport = pcall(function() return writefile and readfile and isfile end)
-local hasJSON = pcall(function() return game:GetService("HttpService").JSONEncode end)
+local player = game:GetService("Players").LocalPlayer
+local mouse = player:GetMouse()
 
 -- ============ CARREGAR KAVO UI ============
-print("🔍 Carregando Kavo UI...")
-local Library = nil
-local loadSuccess, loadError = pcall(function()
-    Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-end)
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 
-if not loadSuccess or not Library then
-    print("❌ Erro ao carregar Kavo UI: " .. tostring(loadError))
-    return
-end
-print("✅ Kavo UI carregada!")
-
--- ============ CONFIGURAÇÕES ============
-local PLACE_CONFIG = {
-    NOVA = { id = "NOVA", nome = "🏙️ Place Nova", animacaoId = "rbxassetid://122367567937291" },
-    ANTIGA = { id = "ANTIGA", nome = "🏚️ Place Antiga", animacaoId = "rbxassetid://124954987474196" }
-}
-local placeAtual = PLACE_CONFIG.NOVA
-
--- ============ VERIFICAR EVENTO JJS ============
-local jjsEvent = nil
-local eventType = nil
-pcall(function()
-    local repStorage = game:GetService("ReplicatedStorage")
-    jjsEvent = repStorage:FindFirstChild("JJsBillboardEvent")
-    if not jjsEvent then
-        jjsEvent = repStorage:WaitForChild("JJsBillboardEvent", 2)
-    end
-    if jjsEvent then
-        if jjsEvent:IsA("RemoteEvent") then eventType = "RemoteEvent"
-        elseif jjsEvent:IsA("RemoteFunction") then eventType = "RemoteFunction" end
-    end
-end)
-local eventFound = jjsEvent ~= nil
-
--- ============ CONFIG ============
-local config = {
-    autoJJsActive = false, jjsCount = 0, delayValue = 0.8,
-    p1Active = false, p2Active = false, p3Active = false, p4Active = false,
-    placeAtual = "NOVA"
-}
-
-local configFolder = "ProdigiozxConfig"
-local configFile = "config.json"
-
-local function saveConfig()
-    if not hasSaveSupport or not hasJSON then return false end
-    local success = pcall(function()
-        if makefolder and not isfolder(configFolder) then makefolder(configFolder) end
-        local data = game:GetService("HttpService"):JSONEncode(config)
-        writefile(configFolder .. "/" .. configFile, data)
-    end)
-    return success
-end
-
-local function loadConfig()
-    if not hasSaveSupport or not hasJSON then return false end
-    local success = pcall(function()
-        if isfile(configFolder .. "/" .. configFile) then
-            local data = readfile(configFolder .. "/" .. configFile)
-            local loaded = game:GetService("HttpService"):JSONDecode(data)
-            for k, v in pairs(loaded) do config[k] = v end
-            return true
-        end
-        return false
-    end)
-    return success
-end
-
--- ============ JANELA PRINCIPAL ============
-print("🔍 Criando janela principal...")
 local Window = Library.CreateLib("PRODIGIOZX MODS | By Lucca", {
     SchemeColor = Color3.fromRGB(255, 0, 0),
     Background = Color3.fromRGB(20, 20, 20),
     Header = Color3.fromRGB(15, 15, 15),
     TextColor = Color3.fromRGB(255, 255, 255)
 })
-print("✅ Janela criada!")
 
--- ============ VARIÁVEIS ============
+-- ============ CONFIGURAÇÕES DE PLACE ============
+local PLACE_CONFIG = {
+    NOVA = {
+        id = "NOVA",
+        nome = "🏙️ Place Nova",
+        animacaoId = "rbxassetid://122367567937291"
+    },
+    ANTIGA = {
+        id = "ANTIGA",
+        nome = "🏚️ Place Antiga",
+        animacaoId = "rbxassetid://124954987474196"
+    }
+}
+
+local placeAtual = PLACE_CONFIG.NOVA
+
+-- ============ TABELAS ============
 local p1Parts, p2Parts, p3Parts, p4Parts = {}, {}, {}, {}
 local buildingP1, buildingP2, buildingP3, buildingP4 = false, false, false, false
+
+-- ============ AUTO JJS VARIÁVEIS ============
+local jjsEvent = nil
+pcall(function()
+    jjsEvent = game:GetService("ReplicatedStorage"):FindFirstChild("JJsBillboardEvent")
+    if not jjsEvent then
+        jjsEvent = game:GetService("ReplicatedStorage"):WaitForChild("JJsBillboardEvent", 2)
+    end
+end)
+
+if not jjsEvent then
+    print("⚠️ Evento JJsBillboardEvent NÃO ENCONTRADO! Auto JJs desativado.")
+end
+
 local ativoJJS = false
 local animTrack = nil
-local jjsCount = config.jjsCount or 0
-local delayValue = config.delayValue or 0.8
+local jjsCount = 0
+local delayValue = 0.8
 local currentLoop = nil
-local loopActive = false
 
-if config.placeAtual == "NOVA" then placeAtual = PLACE_CONFIG.NOVA else placeAtual = PLACE_CONFIG.ANTIGA end
+-- ============ CLONADOR VARIÁVEIS ============
+local clones = {}
+local modoClique = false
+local posicoesFixas = {
+    Vector3.new(146.38, 3.04, -855.76),
+    Vector3.new(145.41, 3.04, -897.85),
+    Vector3.new(398.03, 3.04, -857.27),
+    Vector3.new(396.03, 3.04, -907.93)
+}
 
--- ============ FUNÇÕES ============
-local function updateLabel(label, text)
-    if not label then return end
-    pcall(function()
-        if label.UpdateLabel then label:UpdateLabel(text)
-        elseif label.SetText then label:SetText(text)
-        elseif label.Set then label:Set(text) end
-    end)
-end
+-- ============ MARCADORES VARIÁVEIS ============
+local marcadores = {}
 
-local function setToggle(toggle, state)
-    if not toggle then return end
-    pcall(function()
-        if toggle.Set then toggle:Set(state)
-        elseif toggle.SetState then toggle:SetState(state)
-        elseif toggle.Toggle then toggle:Toggle(state) end
-    end)
-end
+-- ============ RÉGUA DE ÂNGULO VARIÁVEIS ============
+local anguloUI = nil
+local anguloLabel = nil
+local anguloConexao = nil
+
+-- ============ TAF VARIÁVEIS ============
+local tafParts = {}
+
+-- ============ FUNÇÕES DE CONSTRUÇÃO (PISTAS) ============
 
 local function destroyParts(partTable)
-    for _, v in pairs(partTable) do pcall(function() v:Destroy() end) end
+    for _, v in pairs(partTable) do
+        pcall(function() v:Destroy() end)
+    end
     return {}
 end
 
--- ============ FUNÇÕES DE CONSTRUÇÃO ============
 local function buildP1()
     if buildingP1 then return end
     buildingP1 = true
     p1Parts = destroyParts(p1Parts)
-    local positions = {Vector3.new(161,13,-860), Vector3.new(169,13,-853), Vector3.new(181,13,-859), Vector3.new(191,13,-854)}
+    
+    local positions = {
+        Vector3.new(161,13,-860), Vector3.new(169,13,-853),
+        Vector3.new(181,13,-859), Vector3.new(191,13,-854)
+    }
     for _, pos in ipairs(positions) do
         local p = Instance.new("Part")
         p.Size = Vector3.new(4,1,4)
@@ -171,6 +101,7 @@ local function buildP1()
         p.Parent = workspace
         table.insert(p1Parts, p)
     end
+    
     local b1 = Instance.new("Part")
     b1.Size = Vector3.new(26,1,4)
     b1.Position = Vector3.new(218,11,-850)
@@ -178,6 +109,7 @@ local function buildP1()
     b1.Material = "SmoothPlastic"
     b1.Parent = workspace
     table.insert(p1Parts, b1)
+    
     local b2 = Instance.new("Part")
     b2.Size = Vector3.new(15,1,4)
     b2.Position = Vector3.new(242.5,11,-857)
@@ -185,6 +117,7 @@ local function buildP1()
     b2.Material = "SmoothPlastic"
     b2.Parent = workspace
     table.insert(p1Parts, b2)
+    
     buildingP1 = false
 end
 
@@ -192,7 +125,12 @@ local function buildP2()
     if buildingP2 then return end
     buildingP2 = true
     p2Parts = destroyParts(p2Parts)
-    local positions = {Vector3.new(167,53,-904), Vector3.new(173,53,-900), Vector3.new(180,53,-893), Vector3.new(181,53,-903), Vector3.new(167,53,-891), Vector3.new(198,53,-898), Vector3.new(210,53,-898), Vector3.new(223,53,-898), Vector3.new(236,53,-898)}
+    
+    local positions = {
+        Vector3.new(167,53,-904), Vector3.new(173,53,-900), Vector3.new(180,53,-893),
+        Vector3.new(181,53,-903), Vector3.new(167,53,-891), Vector3.new(198,53,-898),
+        Vector3.new(210,53,-898), Vector3.new(223,53,-898), Vector3.new(236,53,-898)
+    }
     for _, pos in ipairs(positions) do
         local p = Instance.new("Part")
         p.Size = Vector3.new(6,1,6)
@@ -202,6 +140,7 @@ local function buildP2()
         p.Parent = workspace
         table.insert(p2Parts, p)
     end
+    
     buildingP2 = false
 end
 
@@ -209,7 +148,13 @@ local function buildP3()
     if buildingP3 then return end
     buildingP3 = true
     p3Parts = destroyParts(p3Parts)
-    local positions = {Vector3.new(389,7,-856), Vector3.new(383,10,-856), Vector3.new(377,12,-856), Vector3.new(371,14,-856), Vector3.new(364,16,-856), Vector3.new(352,19,-856), Vector3.new(345,20,-856), Vector3.new(339,21,-856), Vector3.new(329,21,-856), Vector3.new(318,21,-856), Vector3.new(308,21,-856), Vector3.new(297,21,-856)}
+    
+    local positions = {
+        Vector3.new(389,7,-856), Vector3.new(383,10,-856), Vector3.new(377,12,-856),
+        Vector3.new(371,14,-856), Vector3.new(364,16,-856), Vector3.new(352,19,-856),
+        Vector3.new(345,20,-856), Vector3.new(339,21,-856), Vector3.new(329,21,-856),
+        Vector3.new(318,21,-856), Vector3.new(308,21,-856), Vector3.new(297,21,-856)
+    }
     for _, pos in ipairs(positions) do
         local p = Instance.new("Part")
         p.Size = Vector3.new(6,1,6)
@@ -219,6 +164,7 @@ local function buildP3()
         p.Parent = workspace
         table.insert(p3Parts, p)
     end
+    
     buildingP3 = false
 end
 
@@ -226,7 +172,14 @@ local function buildP4()
     if buildingP4 then return end
     buildingP4 = true
     p4Parts = destroyParts(p4Parts)
-    local positions = {Vector3.new(389,5,-893), Vector3.new(383,7,-893), Vector3.new(378,9,-893), Vector3.new(373,11,-893), Vector3.new(367,11,-893), Vector3.new(362,11,-895), Vector3.new(358,11,-902), Vector3.new(352,11,-895), Vector3.new(347,11,-900), Vector3.new(333,11,-898), Vector3.new(325,11,-898), Vector3.new(318,11,-898), Vector3.new(310,11,-899), Vector3.new(303,11,-899), Vector3.new(295,11,-898)}
+    
+    local positions = {
+        Vector3.new(389,5,-893), Vector3.new(383,7,-893), Vector3.new(378,9,-893),
+        Vector3.new(373,11,-893), Vector3.new(367,11,-893), Vector3.new(362,11,-895),
+        Vector3.new(358,11,-902), Vector3.new(352,11,-895), Vector3.new(347,11,-900),
+        Vector3.new(333,11,-898), Vector3.new(325,11,-898), Vector3.new(318,11,-898),
+        Vector3.new(310,11,-899), Vector3.new(303,11,-899), Vector3.new(295,11,-898)
+    }
     for _, pos in ipairs(positions) do
         local p = Instance.new("Part")
         p.Size = Vector3.new(6,1,6)
@@ -236,550 +189,774 @@ local function buildP4()
         p.Parent = workspace
         table.insert(p4Parts, p)
     end
+    
     buildingP4 = false
 end
 
--- ============ AUTO JJS ============
+-- ============ FUNÇÕES AUTO JJS ============
+
 local function carregarAnimacao()
-    local char = player.Character
-    if not char then return false end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return false end
-    local animId = placeAtual.animacaoId
-    return pcall(function()
-        if animTrack then animTrack:Stop() animTrack = nil end
-        local anim = Instance.new("Animation")
-        anim.AnimationId = animId
-        animTrack = hum:LoadAnimation(anim)
-    end)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid")
+    local anim = Instance.new("Animation")
+    anim.AnimationId = placeAtual.animacaoId
+    animTrack = hum:LoadAnimation(anim)
+    print("✅ Animação carregada: " .. placeAtual.nome)
 end
 
 local function enviarJJs(valor)
-    if not eventFound or not jjsEvent then return end
+    if not jjsEvent then return end
+    local args = { valor }
     pcall(function()
-        if eventType == "RemoteEvent" then jjsEvent:FireServer(unpack({valor}))
-        elseif eventType == "RemoteFunction" then jjsEvent:InvokeServer(unpack({valor}))
-        else
-            pcall(function() jjsEvent:FireServer(unpack({valor})) end)
-            pcall(function() jjsEvent:InvokeServer(unpack({valor})) end)
-        end
+        jjsEvent:FireServer(unpack(args))
     end)
 end
 
 local function tocarAnimacao()
-    if not animTrack then carregarAnimacao() return end
-    pcall(function() animTrack:Stop() animTrack:Play() end)
+    if animTrack then
+        animTrack:Stop()
+        animTrack:Play()
+    end
 end
 
 local function iniciarLoopJJS()
-    if loopActive then
-        if currentLoop then pcall(function() coroutine.close(currentLoop) end) currentLoop = nil end
-        loopActive = false
-        waitFunc(0.1)
-    end
-    if not ativoJJS then return end
-    loopActive = true
-    currentLoop = spawnFunc(function()
-        while ativoJJS and loopActive do
+    if currentLoop then return end
+    
+    currentLoop = task.spawn(function()
+        while ativoJJS do
             jjsCount = jjsCount + 1
-            config.jjsCount = jjsCount
             tocarAnimacao()
             enviarJJs(jjsCount)
-            if countLabel then updateLabel(countLabel, "📊 Total enviado: " .. jjsCount) end
-            waitFunc(delayValue)
+            task.wait(delayValue)
         end
-        loopActive = false
         currentLoop = nil
     end)
 end
 
 local function pararLoopJJS()
     ativoJJS = false
-    loopActive = false
-    if currentLoop then pcall(function() coroutine.close(currentLoop) end) currentLoop = nil end
-    if animTrack then pcall(function() animTrack:Stop() end) end
+    if currentLoop then
+        task.cancel(currentLoop)
+        currentLoop = nil
+    end
+    if animTrack then
+        animTrack:Stop()
+    end
 end
 
--- ============ CRIAR ABAS ============
-print("🔍 Criando abas...")
+-- ============ FUNÇÕES DO CLONADOR ============
 
--- ABA PISTAS
+local function clonar(posicao, angulo)
+    local char = player.Character
+    if not char then
+        print("❌ Personagem não encontrado!")
+        return
+    end
+    
+    angulo = angulo or 0
+    
+    local clone = char:Clone()
+    clone.Name = "Clone_" .. os.time()
+    clone.Parent = workspace
+    
+    local cloneHrp = clone:FindFirstChild("HumanoidRootPart")
+    if cloneHrp then
+        cloneHrp.CFrame = CFrame.new(posicao) * CFrame.Angles(0, math.rad(angulo), 0)
+        cloneHrp.Anchored = true
+    end
+    
+    for _, part in pairs(clone:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = true
+            part.CanCollide = false
+        end
+    end
+    
+    local hum = clone:FindFirstChild("Humanoid")
+    if hum then
+        hum.PlatformStand = true
+    end
+    
+    table.insert(clones, clone)
+    print("✅ Clone criado em: " .. tostring(posicao) .. " | Ângulo: " .. angulo .. "°")
+end
+
+local function criarClonesFixos()
+    local char = player.Character
+    if not char then
+        print("❌ Personagem não encontrado!")
+        return
+    end
+    
+    for _, v in pairs(clones) do
+        pcall(function() v:Destroy() end)
+    end
+    clones = {}
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local angulo = hrp and hrp.Orientation.Y or 0
+    
+    for i, pos in ipairs(posicoesFixas) do
+        clonar(pos, angulo)
+    end
+    
+    print("🔹 " .. #posicoesFixas .. " clones fixos criados!")
+end
+
+local function removerClones()
+    for _, v in pairs(clones) do
+        pcall(function() v:Destroy() end)
+    end
+    clones = {}
+    print("🗑️ Clones removidos!")
+end
+
+local function copiarPosicoesClones()
+    if #clones == 0 then
+        print("⚠️ Nenhum clone encontrado!")
+        return
+    end
+    
+    local texto = ""
+    for i, clone in ipairs(clones) do
+        local hrp = clone:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local pos = hrp.Position
+            texto = texto .. string.format("Clone %d: Vector3.new(%.2f, %.2f, %.2f)\n", i, pos.X, pos.Y, pos.Z)
+        end
+    end
+    
+    setclipboard(texto)
+    print("📋 Posições de " .. #clones .. " clones copiadas!")
+end
+
+-- ============ FUNÇÕES DOS MARCADORES ============
+
+local function criarMarcadores()
+    for _, v in pairs(marcadores) do
+        pcall(function() v:Destroy() end)
+    end
+    marcadores = {}
+    
+    local markers = {
+        { position = Vector3.new(145.89, 3.04, -855.14), angle = -89.9 },
+        { position = Vector3.new(145.41, 3.04, -897.85), angle = -91.8 },
+        { position = Vector3.new(398.03, 3.04, -857.27), angle = 89.0 },
+        { position = Vector3.new(396.03, 3.04, -907.93), angle = 110.8 },
+    }
+    
+    local function createMarker(position, angleDegrees, index)
+        local name = "Marker_" .. index
+        local cframe = CFrame.new(position) * CFrame.Angles(0, math.rad(angleDegrees), 0)
+        
+        local base = Instance.new("Part")
+        base.Name = name
+        base.Size = Vector3.new(4, 0.2, 4)
+        base.Anchored = true
+        base.CanCollide = false
+        base.CanQuery = false
+        base.CanTouch = false
+        base.Material = Enum.Material.Neon
+        base.Color = Color3.fromRGB(255, 0, 0)
+        base.CFrame = cframe
+        base.Parent = workspace
+        table.insert(marcadores, base)
+        
+        local arrow = Instance.new("WedgePart")
+        arrow.Name = name .. "_Arrow"
+        arrow.Size = Vector3.new(1, 1, 3)
+        arrow.Anchored = true
+        arrow.CanCollide = false
+        arrow.CanQuery = false
+        arrow.CanTouch = false
+        arrow.Material = Enum.Material.Neon
+        arrow.Color = Color3.fromRGB(0, 255, 0)
+        arrow.CFrame = cframe * CFrame.new(0, 0.6, -1.5) * CFrame.Angles(0, math.rad(180), 0)
+        arrow.Parent = workspace
+        table.insert(marcadores, arrow)
+        
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = name .. "_Label"
+        billboard.Size = UDim2.new(0, 150, 0, 80)
+        billboard.StudsOffset = Vector3.new(0, 4, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Adornee = base
+        billboard.Parent = base
+        
+        local angleLabel = Instance.new("TextLabel")
+        angleLabel.Size = UDim2.new(1, 0, 0.6, 0)
+        angleLabel.Position = UDim2.new(0, 0, 0, 0)
+        angleLabel.BackgroundTransparency = 1
+        angleLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+        angleLabel.TextStrokeTransparency = 0
+        angleLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        angleLabel.Font = Enum.Font.SourceSansBold
+        angleLabel.TextScaled = true
+        angleLabel.Text = string.format("%.1f°", angleDegrees)
+        angleLabel.Parent = billboard
+        
+        local coordLabel = Instance.new("TextLabel")
+        coordLabel.Size = UDim2.new(1, 0, 0.4, 0)
+        coordLabel.Position = UDim2.new(0, 0, 0.6, 0)
+        coordLabel.BackgroundTransparency = 1
+        coordLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        coordLabel.TextStrokeTransparency = 0
+        coordLabel.Font = Enum.Font.Code
+        coordLabel.TextScaled = true
+        coordLabel.Text = string.format("(%.2f, %.2f, %.2f)", position.X, position.Y, position.Z)
+        coordLabel.Parent = billboard
+    end
+    
+    for i, data in ipairs(markers) do
+        createMarker(data.position, data.angle, i)
+    end
+    
+    print("✅ " .. #markers .. " marcadores criados!")
+end
+
+local function removerMarcadores()
+    for _, v in pairs(marcadores) do
+        pcall(function() v:Destroy() end)
+    end
+    marcadores = {}
+    print("🗑️ Marcadores removidos!")
+end
+
+-- ============ FUNÇÕES DA RÉGUA DE ÂNGULO ============
+
+local function criarAnguloUI()
+    if anguloUI then
+        pcall(function() anguloUI:Destroy() end)
+        anguloUI = nil
+    end
+    
+    if anguloConexao then
+        pcall(function() anguloConexao:Disconnect() end)
+        anguloConexao = nil
+    end
+    
+    anguloUI = Instance.new("ScreenGui")
+    anguloUI.Name = "AnguloUI"
+    anguloUI.ResetOnSpawn = false
+    anguloUI.Parent = player.PlayerGui
+    anguloUI.Enabled = true
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 100)
+    frame.Position = UDim2.new(0.5, -150, 0.02, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 0.4
+    frame.BorderSizePixel = 0
+    frame.Parent = anguloUI
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
+    local tituloLabel = Instance.new("TextLabel")
+    tituloLabel.Size = UDim2.new(1, 0, 0.2, 0)
+    tituloLabel.Position = UDim2.new(0, 0, 0, 0)
+    tituloLabel.BackgroundTransparency = 1
+    tituloLabel.Text = "🎯 ÂNGULO DO PERSONAGEM"
+    tituloLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tituloLabel.Font = Enum.Font.GothamBold
+    tituloLabel.TextSize = 12
+    tituloLabel.Parent = frame
+    
+    anguloLabel = Instance.new("TextLabel")
+    anguloLabel.Size = UDim2.new(1, 0, 0.8, 0)
+    anguloLabel.Position = UDim2.new(0, 0, 0.2, 0)
+    anguloLabel.BackgroundTransparency = 1
+    anguloLabel.Text = "0.0°"
+    anguloLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    anguloLabel.Font = Enum.Font.GothamBlack
+    anguloLabel.TextSize = 55
+    anguloLabel.Parent = frame
+    
+    local runService = game:GetService("RunService")
+    anguloConexao = runService.Heartbeat:Connect(function()
+        if not anguloUI or not anguloLabel then
+            pcall(function() anguloConexao:Disconnect() end)
+            anguloConexao = nil
+            return
+        end
+        
+        local char = player.Character
+        if not char then return end
+        
+        local angulo = nil
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            angulo = hrp.Orientation.Y
+        end
+        
+        if not angulo then
+            local torso = char:FindFirstChild("Torso")
+            if torso then
+                angulo = torso.Orientation.Y
+            end
+        end
+        
+        if not angulo then
+            local upperTorso = char:FindFirstChild("UpperTorso")
+            if upperTorso then
+                angulo = upperTorso.Orientation.Y
+            end
+        end
+        
+        if not angulo then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum.RootPart then
+                angulo = hum.RootPart.Orientation.Y
+            end
+        end
+        
+        if not angulo then
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") and string.find(part.Name, "Root") then
+                    angulo = part.Orientation.Y
+                    break
+                end
+            end
+        end
+        
+        if not angulo then
+            local camera = workspace.CurrentCamera
+            if camera then
+                local look = camera.CFrame.LookVector
+                angulo = math.deg(math.atan2(look.X, -look.Z))
+            end
+        end
+        
+        if angulo then
+            angulo = ((angulo + 180) % 360) - 180
+            anguloLabel.Text = string.format("%.1f°", angulo)
+            
+            if angulo >= -5 and angulo <= 5 then
+                anguloLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            elseif angulo > 5 and angulo <= 45 then
+                anguloLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            elseif angulo > 45 and angulo <= 90 then
+                anguloLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+            elseif angulo > 90 or angulo < -90 then
+                anguloLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+            elseif angulo < -5 and angulo >= -45 then
+                anguloLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            elseif angulo < -45 and angulo >= -90 then
+                anguloLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+            end
+        end
+    end)
+    
+    print("📐 Régua de ângulo ativada!")
+end
+
+local function removerAnguloUI()
+    if anguloConexao then
+        pcall(function() anguloConexao:Disconnect() end)
+        anguloConexao = nil
+    end
+    if anguloUI then
+        pcall(function() anguloUI:Destroy() end)
+        anguloUI = nil
+    end
+    anguloLabel = nil
+    print("🗑️ Régua de ângulo removida!")
+end
+
+-- ============ FUNÇÕES DO TAF ============
+
+local function criarPartesTaf()
+    for _, v in pairs(tafParts) do
+        pcall(function() v:Destroy() end)
+    end
+    tafParts = {}
+    
+    local partes = {
+        {
+            Nome = "BFE",
+            Posicao = Vector3.new(-188.21, 1.04, -873.57),
+            Tamanho = Vector3.new(6, 3, 9.08)
+        },
+        {
+            Nome = "BAC",
+            Posicao = Vector3.new(-268.5, 1, -860.35),
+            Tamanho = Vector3.new(7, 3, 9.3)
+        },
+        {
+            Nome = "BPE",
+            Posicao = Vector3.new(-325.71, 1.54, -860.47),
+            Tamanho = Vector3.new(7, 4, 9)
+        }
+    }
+    
+    for _, info in ipairs(partes) do
+        local p = Instance.new("Part")
+        p.Name = info.Nome
+        p.Size = info.Tamanho
+        p.Position = info.Posicao
+        p.Anchored = true
+        p.Transparency = 0.5
+        p.BrickColor = BrickColor.new("Bright red")
+        p.Material = Enum.Material.Neon
+        p.Parent = workspace
+        table.insert(tafParts, p)
+        print("✅ Parte criada: " .. info.Nome)
+    end
+    
+    print("🔹 " .. #partes .. " partes criadas!")
+end
+
+local function removerPartesTaf()
+    for _, v in pairs(tafParts) do
+        pcall(function() v:Destroy() end)
+    end
+    tafParts = {}
+    print("🗑️ Partes removidas!")
+end
+
+-- ============ FUNÇÃO PARA CARREGAR TAS ============
+local function carregarTAS()
+    print("🔄 Carregando TAS...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bbssgggv112/skwnqnksnw/refs/heads/main/tas.txt"))()
+        print("✅ TAS carregado com sucesso!")
+    end)
+end
+
+-- ============ FUNÇÃO UPDATE LABEL ============
+local function updateLabel(label, text)
+    if not label then return end
+    pcall(function()
+        if label.UpdateLabel then
+            label:UpdateLabel(text)
+        elseif label.SetText then
+            label:SetText(text)
+        elseif label.Set then
+            label:Set(text)
+        end
+    end)
+end
+
+-- ============ ABAS ============
+
+-- ABA: PISTAS
 local TabPistas = Window:NewTab("Auxiliares")
 local SecPistas = TabPistas:NewSection("Pistas de Treino")
-local p1Toggle, p2Toggle, p3Toggle, p4Toggle
 
-p1Toggle = SecPistas:NewToggle("Parkour 1", "Ativa P1 + Pontes", function(s)
-    config.p1Active = s
-    if s then spawnFunc(buildP1) else spawnFunc(function() p1Parts = destroyParts(p1Parts) end) end
-    saveConfig()
+SecPistas:NewToggle("Parkour 1", "Ativa P1 + Pontes", function(s)
+    if s then buildP1() else for _,v in pairs(p1Parts) do v:Destroy() end p1Parts = {} end
 end)
 
-p2Toggle = SecPistas:NewToggle("Parkour 2", "Ativa P2", function(s)
-    config.p2Active = s
-    if s then spawnFunc(buildP2) else spawnFunc(function() p2Parts = destroyParts(p2Parts) end) end
-    saveConfig()
+SecPistas:NewToggle("Parkour 2", "Ativa P2", function(s)
+    if s then buildP2() else for _,v in pairs(p2Parts) do v:Destroy() end p2Parts = {} end
 end)
 
-p3Toggle = SecPistas:NewToggle("Parkour 3", "Ativa P3", function(s)
-    config.p3Active = s
-    if s then spawnFunc(buildP3) else spawnFunc(function() p3Parts = destroyParts(p3Parts) end) end
-    saveConfig()
+SecPistas:NewToggle("Parkour 3", "Ativa P3", function(s)
+    if s then buildP3() else for _,v in pairs(p3Parts) do v:Destroy() end p3Parts = {} end
 end)
 
-p4Toggle = SecPistas:NewToggle("Parkour 4", "Ativa P4", function(s)
-    config.p4Active = s
-    if s then spawnFunc(buildP4) else spawnFunc(function() p4Parts = destroyParts(p4Parts) end) end
-    saveConfig()
+SecPistas:NewToggle("Parkour 4", "Ativa P4", function(s)
+    if s then buildP4() else for _,v in pairs(p4Parts) do v:Destroy() end p4Parts = {} end
 end)
 
--- ABA PLACE
+-- ABA: PLACE
 local TabPlace = Window:NewTab("Place")
 local SecPlace = TabPlace:NewSection("Selecionar Place")
+
 local placeLabel = SecPlace:NewLabel("📍 Place atual: " .. placeAtual.nome)
 
 SecPlace:NewButton("🏙️ Place Nova", "Usar animação da nova place", function()
     placeAtual = PLACE_CONFIG.NOVA
-    config.placeAtual = "NOVA"
     updateLabel(placeLabel, "📍 Place atual: " .. placeAtual.nome)
-    carregarAnimacao()
-    saveConfig()
+    if animTrack then carregarAnimacao() end
+    print("✅ Place alterada para: NOVA")
 end)
 
 SecPlace:NewButton("🏚️ Place Antiga", "Usar animação da place antiga", function()
     placeAtual = PLACE_CONFIG.ANTIGA
-    config.placeAtual = "ANTIGA"
     updateLabel(placeLabel, "📍 Place atual: " .. placeAtual.nome)
-    carregarAnimacao()
-    saveConfig()
+    if animTrack then carregarAnimacao() end
+    print("✅ Place alterada para: ANTIGA")
 end)
 
--- ABA AUTO JJS
+SecPlace:NewLabel("")
+SecPlace:NewLabel("📌 INFORMAÇÕES:")
+SecPlace:NewLabel("• Nova Place: rbxassetid://122367567937291")
+SecPlace:NewLabel("• Antiga Place: rbxassetid://124954987474196")
+
+-- ABA: AUTO JJS
 local TabJJS = Window:NewTab("Auto JJs")
 local SecJJS = TabJJS:NewSection("Auto Farm JJs")
 
-local countLabel = SecJJS:NewLabel("📊 Total enviado: " .. jjsCount)
+local countLabel = SecJJS:NewLabel("📊 Total enviado: 0")
 local statusLabel = SecJJS:NewLabel("Status: Parado")
-local autoJJsToggle = nil
 
-if not eventFound then updateLabel(statusLabel, "Status: Evento não encontrado!") end
-
-autoJJsToggle = SecJJS:NewToggle("🔘 LIGAR/DESLIGAR", "Ativa o auto farm de JJs", function(state)
-    if not eventFound then
-        updateLabel(statusLabel, "Status: Evento não encontrado!")
-        setToggle(autoJJsToggle, false)
-        return
-    end
-    ativoJJS = state
-    config.autoJJsActive = state
+SecJJS:NewToggle("🔘 LIGAR/DESLIGAR", "Ativa o auto farm de JJs", function(state)
     if state then
+        ativoJJS = true
         if not animTrack then carregarAnimacao() end
         iniciarLoopJJS()
-        updateLabel(statusLabel, "Status: Rodando")
+        statusLabel:UpdateLabel("Status: Rodando")
     else
         pararLoopJJS()
-        updateLabel(statusLabel, "Status: Parado")
+        statusLabel:UpdateLabel("Status: Parado")
     end
-    saveConfig()
 end)
 
 SecJJS:NewButton("🔄 RESETAR CONTADOR", "Zera o contador", function()
     jjsCount = 0
-    config.jjsCount = 0
-    updateLabel(countLabel, "📊 Total enviado: 0")
-    saveConfig()
+    countLabel:UpdateLabel("📊 Total enviado: 0")
 end)
 
 SecJJS:NewSlider("⚡ VELOCIDADE", "Delay entre animações (0.1s - 2.0s)", 20, 1, function(value)
     delayValue = value / 10
-    config.delayValue = delayValue
-    saveConfig()
-end)
-
-local delayDisplay = SecJJS:NewLabel(string.format("⚙️ Delay atual: %.1f segundos", delayValue))
-spawnFunc(function()
-    while true do
-        waitFunc(0.5)
-        updateLabel(delayDisplay, string.format("⚙️ Delay atual: %.1f segundos", delayValue))
-    end
 end)
 
 SecJJS:NewButton("🎭 TESTAR ANIMAÇÃO", "Testa a animação atual", function()
-    if not animTrack then carregarAnimacao() waitFunc(0.3) end
+    if not animTrack then carregarAnimacao() end
     tocarAnimacao()
+    print("🎭 Testando animação: " .. placeAtual.nome)
 end)
 
--- ABA SAVE/LOAD
-local TabSave = Window:NewTab("Save/Load")
-local SecSave = TabSave:NewSection("Salvar e Carregar")
-local saveStatus = SecSave:NewLabel("💾 Status: Pronto")
+-- ABA: CLONADOR
+local TabClonar = Window:NewTab("Clonador")
+local SecClonar = TabClonar:NewSection("Clonar")
 
-SecSave:NewButton("💾 SALVAR", "Salva configurações", function()
-    if not hasSaveSupport then updateLabel(saveStatus, "💾 Status: Executor sem suporte!") waitFunc(2) updateLabel(saveStatus, "💾 Status: Pronto") return end
-    config.jjsCount = jjsCount
-    config.delayValue = delayValue
-    config.autoJJsActive = ativoJJS
-    config.placeAtual = placeAtual.id
-    saveConfig()
-    updateLabel(saveStatus, "💾 Status: Salvo!")
-    waitFunc(2)
-    updateLabel(saveStatus, "💾 Status: Pronto")
-end)
+local cloneCountLabel = SecClonar:NewLabel("📊 Clones gerados: 0")
 
-SecSave:NewButton("📂 CARREGAR", "Carrega configurações", function()
-    if not hasSaveSupport then updateLabel(saveStatus, "💾 Status: Executor sem suporte!") waitFunc(2) updateLabel(saveStatus, "💾 Status: Pronto") return end
-    if loadConfig() then
-        jjsCount = config.jjsCount
-        delayValue = config.delayValue
-        if config.placeAtual == "NOVA" then placeAtual = PLACE_CONFIG.NOVA else placeAtual = PLACE_CONFIG.ANTIGA end
-        updateLabel(placeLabel, "📍 Place atual: " .. placeAtual.nome)
-        carregarAnimacao()
-        updateLabel(countLabel, "📊 Total enviado: " .. jjsCount)
-        if config.autoJJsActive then
-            ativoJJS = true
-            if not animTrack then carregarAnimacao() end
-            iniciarLoopJJS()
-            updateLabel(statusLabel, "Status: Rodando")
-            setToggle(autoJJsToggle, true)
-        else
-            ativoJJS = false
-            pararLoopJJS()
-            updateLabel(statusLabel, "Status: Parado")
-            setToggle(autoJJsToggle, false)
-        end
-        spawnFunc(function()
-            if config.p1Active then buildP1() setToggle(p1Toggle, true) else setToggle(p1Toggle, false) p1Parts = destroyParts(p1Parts) end
-            if config.p2Active then buildP2() setToggle(p2Toggle, true) else setToggle(p2Toggle, false) p2Parts = destroyParts(p2Parts) end
-            if config.p3Active then buildP3() setToggle(p3Toggle, true) else setToggle(p3Toggle, false) p3Parts = destroyParts(p3Parts) end
-            if config.p4Active then buildP4() setToggle(p4Toggle, true) else setToggle(p4Toggle, false) p4Parts = destroyParts(p4Parts) end
-        end)
-        updateLabel(saveStatus, "💾 Status: Carregado!")
-    else
-        updateLabel(saveStatus, "💾 Status: Sem save!")
+SecClonar:NewButton("🧍 CLONAR AQUI", "Gera um clone na sua posição", function()
+    local char = player.Character
+    if not char then
+        print("❌ Personagem não encontrado!")
+        return
     end
-    waitFunc(2)
-    updateLabel(saveStatus, "💾 Status: Pronto")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        print("❌ HumanoidRootPart não encontrado!")
+        return
+    end
+    local angulo = hrp.Orientation.Y
+    clonar(hrp.Position, angulo)
+    updateLabel(cloneCountLabel, "📊 Clones gerados: " .. #clones)
 end)
 
-SecSave:NewButton("🗑️ RESETAR", "Apaga configurações", function()
-    if not hasSaveSupport then updateLabel(saveStatus, "💾 Status: Executor sem suporte!") waitFunc(2) updateLabel(saveStatus, "💾 Status: Pronto") return end
-    pcall(function() delfile(configFolder .. "/" .. configFile) end)
-    updateLabel(saveStatus, "💾 Status: Resetado!")
-    waitFunc(2)
-    updateLabel(saveStatus, "💾 Status: Pronto")
+SecClonar:NewToggle("🖱️ MODO CLIQUE", "Clique no chão para clonar", function(state)
+    modoClique = state
+    print(state and "🖱️ Modo clique ATIVADO" or "🖱️ Modo clique DESATIVADO")
 end)
 
--- ABA CRÉDITOS
+SecClonar:NewButton("📍 CLONES FIXOS", "Gera clones nas posições fixas", function()
+    criarClonesFixos()
+    updateLabel(cloneCountLabel, "📊 Clones gerados: " .. #clones)
+end)
+
+SecClonar:NewButton("🗑️ REMOVER CLONES", "Remove todos os clones", function()
+    removerClones()
+    updateLabel(cloneCountLabel, "📊 Clones gerados: 0")
+end)
+
+-- ABA: POSIÇÕES
+local TabPos = Window:NewTab("Posições")
+local SecPos = TabPos:NewSection("Copiar Posições")
+
+SecPos:NewButton("📋 COPIAR POSIÇÕES DOS CLONES", "Copia a posição de todos os clones", function()
+    copiarPosicoesClones()
+end)
+
+SecPos:NewButton("📋 LISTAR CLONES", "Mostra todos os clones no console", function()
+    if #clones == 0 then
+        print("⚠️ Nenhum clone encontrado!")
+        return
+    end
+    print("===== CLONES =====")
+    for i, clone in ipairs(clones) do
+        local hrp = clone:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local pos = hrp.Position
+            print(i .. ". " .. clone.Name .. " - " .. string.format("(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z))
+        end
+    end
+end)
+
+-- ============ ABA: TÁS (NOVA) ============
+local TabTas = Window:NewTab("Tás")
+local SecTas = TabTas:NewSection("TAS - Ferramentas")
+
+-- Botão para carregar TAS
+SecTas:NewButton("🚀 CARREGAR TAS", "Carrega o script TAS", function()
+    carregarTAS()
+end)
+
+-- Subseção: Marcadores
+SecTas:NewLabel("")
+SecTas:NewLabel("━━━━━ 📍 MARCADORES ━━━━━")
+
+SecTas:NewButton("📍 GERAR MARCADORES", "Cria marcadores com ângulos nas posições fixas", function()
+    criarMarcadores()
+end)
+
+SecTas:NewButton("🗑️ REMOVER MARCADORES", "Remove todos os marcadores", function()
+    removerMarcadores()
+end)
+
+SecTas:NewLabel("📌 POSIÇÕES DOS MARCADORES:")
+SecTas:NewLabel("• Marker 1: 145.89, 3.04, -855.14 | -89.9°")
+SecTas:NewLabel("• Marker 2: 145.41, 3.04, -897.85 | -91.8°")
+SecTas:NewLabel("• Marker 3: 398.03, 3.04, -857.27 | 89.0°")
+SecTas:NewLabel("• Marker 4: 396.03, 3.04, -907.93 | 110.8°")
+
+-- Subseção: Régua
+SecTas:NewLabel("")
+SecTas:NewLabel("━━━━━ 📐 RÉGUA DE ÂNGULO ━━━━━")
+
+SecTas:NewButton("📐 MOSTRAR RÉGUA", "Mostra o ângulo do seu personagem na tela", function()
+    criarAnguloUI()
+end)
+
+SecTas:NewButton("🗑️ REMOVER RÉGUA", "Remove a régua de ângulo", function()
+    removerAnguloUI()
+end)
+
+SecTas:NewLabel("📌 INFORMAÇÕES:")
+SecTas:NewLabel("• A régua mostra o ângulo em tempo real")
+SecTas:NewLabel("• Cores: Verde (frente) | Amarelo (lado)")
+SecTas:NewLabel("• Laranja (diagonal) | Vermelho (costas)")
+SecTas:NewLabel("• Ângulo normalizado entre -180° e 180°")
+
+-- ============ FIM DA ABA TÁS ============
+
+-- ABA: TAF
+local TabTaf = Window:NewTab("Taf")
+local SecTaf = TabTaf:NewSection("Partes de Proteção")
+
+SecTaf:NewButton("🟢 CRIAR PARTES", "Cria as partes de proteção do brasão", function()
+    criarPartesTaf()
+end)
+
+SecTaf:NewButton("🔴 REMOVER PARTES", "Remove todas as partes", function()
+    removerPartesTaf()
+end)
+
+SecTaf:NewLabel("")
+SecTaf:NewLabel("📌 POSIÇÕES DAS PARTES:")
+SecTaf:NewLabel("• BFE: -188.21, 1.04, -873.57")
+SecTaf:NewLabel("• BAC: -268.5, 1, -860.35")
+SecTaf:NewLabel("• BPE: -325.71, 1.54, -860.47")
+
+-- ABA: CRÉDITOS
 local CreditTab = Window:NewTab("Créditos")
 local CreditSec = CreditTab:NewSection("Criador")
+
 CreditSec:NewLabel("👑 CRIADOR: Lucca")
 CreditSec:NewLabel("📖 UI: Kavo Library")
-CreditSec:NewLabel("📱 Modo: " .. (isMobile and "MOBILE" or isConsole and "CONSOLE" or "DESKTOP"))
-CreditSec:NewLabel("💾 Save/Load: " .. (hasSaveSupport and "✅" or "❌"))
-CreditSec:NewLabel("🎯 Auto JJs: " .. (eventFound and "✅" or "❌"))
+CreditSec:NewLabel("⚡ Executor: Velocity")
 
--- ABA CONFIGURAÇÕES
+-- ABA: CONFIGURAÇÕES
 local ConfigTab = Window:NewTab("Configurações")
 local ConfigSec = ConfigTab:NewSection("Controles")
+
 ConfigSec:NewKeybind("🔑 TOGGLE UI", "Tecla para mostrar/esconder", Enum.KeyCode.RightControl, function()
     Library:ToggleUI()
 end)
 
-print("✅ Abas criadas!")
-
--- ============ BOLINHA VERMELHA - MOBILE ============
-local function criarBolinhaMobile()
-    print("📱 Criando versão Mobile...")
-    local existingGui = player.PlayerGui:FindFirstChild("LG_Toggle")
-    if existingGui then existingGui:Destroy() end
-    
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "LG_Toggle"
-    sg.ResetOnSpawn = false
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    sg.Parent = player.PlayerGui
-    sg.IgnoreGuiInset = true
-    
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 80, 0, 80)
-    btn.Position = UDim2.new(0, 20, 0, 150)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    btn.Text = "LG"
-    btn.TextScaled = true
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0
-    btn.Parent = sg
-    btn.ZIndex = 999
-    btn.AutoButtonColor = false
-    btn.BorderSizePixel = 0
-    btn.Visible = true
-    btn.Modal = true
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = btn
-    
-    local shadow = Instance.new("ImageLabel")
-    shadow.Size = UDim2.new(1.2, 0, 1.2, 0)
-    shadow.Position = UDim2.new(-0.1, 0, -0.1, 0)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://1316045965"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.6
-    shadow.ZIndex = 998
-    shadow.Parent = btn
-    
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    local wasDragging = false
-    
-    local function getScreenSize()
-        local camera = workspace.CurrentCamera
-        if camera then return camera.ViewportSize.X, camera.ViewportSize.Y end
-        return 1920, 1080
+-- ============ SISTEMA DE CLIQUE ============
+mouse.Button1Down:Connect(function()
+    if modoClique then
+        local pos = mouse.Hit.p
+        clonar(pos, 0)
+        updateLabel(cloneCountLabel, "📊 Clones gerados: " .. #clones)
     end
-    
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            local position = input.Position
-            local btnPos = btn.AbsolutePosition
-            local btnSize = btn.AbsoluteSize
-            if position.X >= btnPos.X and position.X <= btnPos.X + btnSize.X and
-               position.Y >= btnPos.Y and position.Y <= btnPos.Y + btnSize.Y then
-                dragging = true
-                wasDragging = false
-                dragStart = input.Position
-                startPos = btn.Position
-                input:StopPropagation()
-            end
-        end
-    end)
-    
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            if dragging and not wasDragging then Library:ToggleUI() end
-            dragging = false
-            input:StopPropagation()
-        end
-    end)
-    
-    userInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.Touch then
-            wasDragging = true
-            local delta = input.Position - dragStart
-            local newX = startPos.X.Offset + delta.X
-            local newY = startPos.Y.Offset + delta.Y
-            local screenW, screenH = getScreenSize()
-            local btnW = btn.Size.X.Offset
-            local btnH = btn.Size.Y.Offset
-            newX = math.clamp(newX, 0, screenW - btnW)
-            newY = math.clamp(newY, 0, screenH - btnH - 80)
-            btn.Position = UDim2.new(0, newX, 0, newY)
-            input:StopPropagation()
-        end
-    end)
-    
-    btn.TouchTap:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-        waitFunc(0.1)
-        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    end)
-    
-    print("✅ Bolinha Mobile criada!")
-    return true
-end
-
--- ============ BOLINHA VERMELHA - DESKTOP CORRIGIDA ============
-local function criarBolinhaDesktop()
-    print("🖥️ Criando versão Desktop...")
-    local existingGui = player.PlayerGui:FindFirstChild("LG_Toggle")
-    if existingGui then existingGui:Destroy() end
-    
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "LG_Toggle"
-    sg.ResetOnSpawn = false
-    sg.Parent = player.PlayerGui
-    
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 55, 0, 55)
-    btn.Position = UDim2.new(0, 20, 0.5, -27.5)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    btn.Text = "LG"
-    btn.TextScaled = true
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0
-    btn.Parent = sg
-    btn.ZIndex = 999
-    btn.AutoButtonColor = false
-    btn.BorderSizePixel = 0
-    btn.Modal = true
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = btn
-    
-    local shadow = Instance.new("ImageLabel")
-    shadow.Size = UDim2.new(1.2, 0, 1.2, 0)
-    shadow.Position = UDim2.new(-0.1, 0, -0.1, 0)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://1316045965"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.5
-    shadow.ZIndex = 998
-    shadow.Parent = btn
-    
-    -- ============ SISTEMA DE DRAG PARA PC ============
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    local wasDragging = false
-    
-    local function getScreenSize()
-        local camera = workspace.CurrentCamera
-        if camera then
-            return camera.ViewportSize.X, camera.ViewportSize.Y
-        end
-        return 1920, 1080
-    end
-    
-    -- QUANDO CLICAR NO BOTÃO
-    btn.MouseButton1Down:Connect(function()
-        dragging = true
-        wasDragging = false
-        dragStart = userInputService:GetMouseLocation()
-        startPos = btn.Position
-        print("🔄 Drag iniciado")
-    end)
-    
-    -- QUANDO SOLTAR O CLIQUE
-    userInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if dragging and not wasDragging then
-                Library:ToggleUI()
-                print("📂 Abriu UI")
-            end
-            dragging = false
-        end
-    end)
-    
-    -- QUANDO MOVER O MOUSE
-    userInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            wasDragging = true
-            local mousePos = userInputService:GetMouseLocation()
-            local delta = mousePos - dragStart
-            local newX = startPos.X.Offset + delta.X
-            local newY = startPos.Y.Offset + delta.Y
-            local screenW, screenH = getScreenSize()
-            local btnW = btn.Size.X.Offset
-            local btnH = btn.Size.Y.Offset
-            newX = math.clamp(newX, 0, screenW - btnW)
-            newY = math.clamp(newY, 0, screenH - btnH - 50)
-            btn.Position = UDim2.new(0, newX, 0, newY)
-        end
-    end)
-    
-    -- EFEITOS VISUAIS
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(220, 0, 0)
-    end)
-    
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    end)
-    
-    print("✅ Bolinha Desktop criada com drag funcionando!")
-    return true
-end
-
--- ============ EXECUTAR BOLINHA ============
-local bolinhaSucesso = false
-if isMobile then
-    bolinhaSucesso = pcall(criarBolinhaMobile)
-else
-    bolinhaSucesso = pcall(criarBolinhaDesktop)
-end
-
-if not bolinhaSucesso then
-    print("⚠️ Falha na bolinha, tentando fallback...")
-    pcall(function()
-        local sg = Instance.new("ScreenGui")
-        sg.Name = "LG_Toggle"
-        sg.ResetOnSpawn = false
-        sg.Parent = player.PlayerGui
-        
-        local btn = Instance.new("TextButton")
-        btn.Size = isMobile and UDim2.new(0, 70, 0, 70) or UDim2.new(0, 55, 0, 55)
-        btn.Position = UDim2.new(0, 20, 0.5, -27.5)
-        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        btn.Text = "LG"
-        btn.TextScaled = true
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Parent = sg
-        btn.ZIndex = 999
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = btn
-        
-        btn.MouseButton1Click:Connect(function() Library:ToggleUI() end)
-        if isMobile then
-            btn.TouchTap:Connect(function() Library:ToggleUI() end)
-        end
-        print("✅ Bolinha fallback criada!")
-    end)
-end
-
--- ============ INICIALIZAÇÃO ============
-print("🔍 Inicializando...")
-
-loadConfig()
-
-if config.placeAtual == "NOVA" then placeAtual = PLACE_CONFIG.NOVA else placeAtual = PLACE_CONFIG.ANTIGA end
-jjsCount = config.jjsCount
-delayValue = config.delayValue
-
-spawnFunc(function()
-    while not player.Character do waitFunc(0.5) end
-    waitFunc(0.5)
-    carregarAnimacao()
 end)
 
+-- ============ ATUALIZAR CONTADOR ============
+task.spawn(function()
+    while true do
+        task.wait(1)
+        updateLabel(cloneCountLabel, "📊 Clones gerados: " .. #clones)
+    end
+end)
+
+-- ============ BOLINHA VERMELHA ============
+local sg = Instance.new("ScreenGui", player.PlayerGui)
+sg.Name = "LG_Toggle"
+sg.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton", sg)
+btn.Size = UDim2.new(0, 50, 0, 50)
+btn.Position = UDim2.new(0, 20, 0.5, -25)
+btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+btn.Text = "LG"
+btn.TextScaled = true
+btn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+local dragging = false
+local dragStart = nil
+local startPos = nil
+local wasDragging = false
+local userInputService = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
+
+btn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        wasDragging = false
+        dragStart = input.Position
+        startPos = btn.Position
+    end
+end)
+
+btn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        if dragging and not wasDragging then
+            Library:ToggleUI()
+        end
+        dragging = false
+    end
+end)
+
+userInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                     input.UserInputType == Enum.UserInputType.Touch) then
+        wasDragging = true
+        local delta = input.Position - dragStart
+        
+        local newX = startPos.X.Offset + delta.X
+        local newY = startPos.Y.Offset + delta.Y
+        
+        local viewport = camera.ViewportSize
+        local maxX = viewport.X - btn.Size.X.Offset
+        local maxY = viewport.Y - btn.Size.Y.Offset
+        
+        newX = math.clamp(newX, 0, maxX)
+        newY = math.clamp(newY, 0, maxY)
+        
+        btn.Position = UDim2.new(0, newX, 0, newY)
+    end
+end)
+
+-- ============ INICIALIZAÇÃO ============
+
+if player.Character then
+    carregarAnimacao()
+else
+    player.CharacterAdded:Connect(carregarAnimacao)
+end
+
 player.CharacterAdded:Connect(function()
-    waitFunc(0.5)
+    task.wait(0.5)
     carregarAnimacao()
     if ativoJJS then
         pararLoopJJS()
-        waitFunc(0.5)
-        if ativoJJS then iniciarLoopJJS() end
     end
 end)
 
-spawnFunc(function()
-    waitFunc(1.5)
-    if config.p1Active then spawnFunc(buildP1) setToggle(p1Toggle, true) end
-    if config.p2Active then spawnFunc(buildP2) setToggle(p2Toggle, true) end
-    if config.p3Active then spawnFunc(buildP3) setToggle(p3Toggle, true) end
-    if config.p4Active then spawnFunc(buildP4) setToggle(p4Toggle, true) end
-end)
-
--- ============ STATUS FINAL ============
-print("========================================")
-print("✅ PRODIGIOZX MODS CARREGADO!")
+print("✅ PRODIGIOZX MODS carregado!")
 print("👑 Criador: Lucca")
-print("📱 Modo: " .. (isMobile and "MOBILE" or isConsole and "CONSOLE" or "DESKTOP"))
-print("🏙️ Place: " .. placeAtual.nome)
-print("🎯 Auto JJs: " .. (eventFound and "Disponível" or "Indisponível"))
-
-local checkGui = player.PlayerGui:FindFirstChild("LG_Toggle")
-if checkGui then
-    print("🔴 Bolinha LG: VISÍVEL ✅")
-else
-    print("🔴 Bolinha LG: NÃO ENCONTRADA ❌")
-end
-print("========================================")
-
--- Tenta abrir a UI automaticamente
-waitFunc(0.5)
-Library:ToggleUI()
-print("📂 UI aberta automaticamente!")
+print("📋 Abas: Auxiliares | Place | Auto JJs | Clonador | Posições | Tás | Taf | Créditos | Configurações")
+print("🚀 TAS disponível na aba 'Tás'!")
+print("📍 Marcadores e Régua também estão na aba 'Tás'!")
